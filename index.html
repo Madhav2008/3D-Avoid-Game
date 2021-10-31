@@ -1,0 +1,342 @@
+<html>
+  <head>
+<!--
+    <script src="https://aframe.io/releases/0.6.1/aframe.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/0.6.1/aframe-master.min.js"></script>
+-->
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/0.5.0/aframe.min.js"></script>
+  </head>
+  <body>
+    <a-scene>
+       <a-assets>
+           <img src="images/tron-ground.png" id="ground">
+           <img src="images/building.png" id="building1">
+           <img src="images/building2.png" id="building2">
+           <img src="images/matrix.png" id="matrix">
+           <img src="images/yellow.jpg" id="yellow">
+           <img src="images/blue.jpg" id="blue">
+           <audio id="techno" src="sounds/techno.mp3" preload="auto"></audio>
+           <audio id="crash" src="sounds/hit.mp3" preload="auto"></audio>
+           <audio id="coinSound" src="sounds/coin.mp3" preload="auto"></audio>
+       </a-assets>
+       
+        <a-sky color="#000"></a-sky>
+       
+        
+        <a-plane rotation="-90 0 0" width="100" height="1000" src="#ground" repeat="4 50"></a-plane>
+<!--        <a-plane rotation="-90 0 0" width="100" height="100" color="#a3d97d" repeat="4 4"></a-plane>-->
+       
+       <a-plane transparent ="true" width="1000" height="1000" src="#matrix" position="0 50 0" side="double" repeat="10 10" rotation="-90 0 0"></a-plane>
+        
+        <!--  GOAL      -->
+        <a-plane id="goal" position="0 0 -336.2578594712859" opacity="0.7" width="20" height="1000" color="yellow"></a-plane>
+        
+        <!--  Bounds      -->
+        <a-plane position="-40 0 0" opacity="0.5" height="10" width="500" color="red" rotation="0 90 0"></a-plane>
+        <a-plane position="40 0 0" opacity="0.5" height="10" width="500" color="red" rotation="0 -90 0"></a-plane>
+        
+        <!--  Instructions      -->
+           
+        <a-entity id="instructions" position="0 10 30" text="value: You are lost in another world\n Your only chance of exit is the glowing yellow light at the end\n Collect coins along the way\n\n Steer your vehicle by looking left to go left\n and go right by looking to the left\n\n Good luck\n\nYour Journey will start soon; width:30; height:10;"></a-entity>
+           
+           
+        
+        
+        <a-camera position="0 0 50" wasd-controls="enabled:false" >
+            <a-entity id="text" position="-2 3 -5"  text="value:Coins: 0; width:6; align:center" ></a-entity>
+            <a-entity class="sounds" id="bgMusic" sound="src: #techno; autoplay:true; loop:true; volume:0.3;"></a-entity>
+            <a-entity class="sounds" id="hit" sound="src: #crash; autoplay:false;"></a-entity>
+            <a-entity class="sounds" id="coin" sound="src: #coinSound; autoplay:false;"></a-entity>
+            <a-cursor></a-cursor>
+        </a-camera>
+        
+<!--        <a-circle src="images/yellow.jpg" radius="5" rotation="-90 0 0" position="0 0 35"></a-circle>-->
+<!--        <a-circle src="images/yellow.jpg" radius="0.3" position="0 1 35"></a-circle>-->
+        
+    
+      
+        
+        
+    </a-scene>
+    
+    <script>
+    
+      //to get text value
+      //text.components.text.attrValue.value
+      //textBox.setAttribute("text",{value:"pokemon"})
+      var camera = document.querySelector("a-camera")
+      var scene = document.querySelector("a-scene")
+      var goal = document.querySelector("#goal");
+      var textBox = document.querySelector("#text")
+      //var instructionBox = document.querySelector("#instructions")
+      var moveLeft = false;
+      var moveRight = false;
+      var startMoving = false;
+      var leftXCheck = -40;
+      var rightXCheck = 40;
+      var enemies = [];
+      var coins = [];
+      var numCoins = 0;
+      var colors = ["#bf3eff","#ddcec4","#aa99ae","#b40000","#cb9b37","#98877b","#a998ae","#c3e198","#f2f1e7"]
+      var minDistance = 1.5;
+        
+      var sounds = document.querySelectorAll(".sounds");
+      var update = null;
+      var counter = 10;
+      
+      
+        
+      window.onload=function(){
+          
+          
+          
+         /* instructionBox.addEventListener("click",function(){
+              setTimeout(function(){
+                  startMoving = true;
+              },3000)
+          })*/
+          
+          
+//          setTimeout(function(){
+//              startMoving = true;
+//          },5000)
+          
+          addEnemies();
+          addCoins();
+          textBox.setAttribute("text",{value: "Coins:" + numCoins.toString(),width:10,height:2,align:"center"})
+          
+          
+          update = setInterval(function(){
+            cameraEdgeCheck();
+            moveCamera();
+            
+            //start moving
+            if(startMoving){
+                current = getCameraPosition();
+                if(moveLeft){
+                    //console.log("true")
+                    setCameraPosition(current.x-=0.8,current.y,current.z)
+                }
+                if(moveRight){
+                    //console.log("true")
+                    setCameraPosition(current.x+=0.8,current.y,current.z)
+                }
+                setCameraPosition(current.x,current.y,current.z-=0.8)
+            }
+              
+              
+            
+            //collision
+            enemies.forEach(function(enemy){
+                camera = document.querySelector("a-camera")
+                checkCollision(camera,enemy)
+
+              });
+              
+            coins.forEach(function(coin){
+                camera = document.querySelector("a-camera")
+                checkCollision(camera,coin)
+
+              });
+              
+            camera = document.querySelector("a-camera")
+            goal = document.querySelector("#goal")
+            checkCollision(camera,goal)
+            
+            
+          },60)
+          
+            
+      }
+      
+      
+      
+      //functions
+      var getCameraRotation = function(){
+          //console.log(camera.getAttribute("rotation"))
+          return rotation=camera.getAttribute("rotation")
+          
+          }
+      
+      var getCameraPosition = function(){
+          return position = camera.getAttribute("position")
+      }
+      
+      
+      
+      var moveCamera = function(){
+          rotation = getCameraRotation();
+          if(rotation.y >= 20){
+              moveLeft = true;
+          }else{
+              moveLeft = false;
+          }
+          
+          if(rotation.y <= -20){
+              moveRight = true;
+          }else{
+              moveRight = false;
+          }
+      }
+      
+      
+      
+      var setCameraPosition = function(x = 0,y = 0,z = 0){
+          camera.setAttribute("position",{x:x,y:y,z:z})
+      }
+      
+      var cameraEdgeCheck = function(){
+          if(getCameraPosition().x <= leftXCheck){
+              //console.log("over")
+              var currentPosition = getCameraPosition()
+              setCameraPosition(0,currentPosition.y,currentPosition.z)
+          }
+          
+          if(getCameraPosition().x >= rightXCheck){
+              //console.log("over")
+              var currentPosition = getCameraPosition()
+              setCameraPosition(0,currentPosition.y,currentPosition.z)
+          }
+          
+          goalPosition = goal.getAttribute("position")
+          
+          if(getCameraPosition().z <= -336.2578594712859 && Math.abs(getCameraPosition().x - goalPosition.x) <= 4){
+              //console.log("at the end")
+              goal = document.querySelector("#goal")
+              goal.setAttribute("visible",false)
+              textBox.setAttribute("text",{value: "You escaped and no longer lost", align:"center",width:6})
+              startMoving=false;
+              clearInterval(update);
+              setTimeout(function(){
+                  //kill music
+                  sounds.forEach(function(sound){
+                      sound.components.sound.stopSound()
+                  })
+              },1000)
+              
+          }else if(getCameraPosition().z <= -336.2578594712859 && Math.abs(getCameraPosition().x - goalPosition.x) >= 4){
+             //console.log("at the end")
+              goal = document.querySelector("#goal")
+              goal.setAttribute("visible",false)
+              textBox.setAttribute("text",{value: "You missed the teleporter you are still lost", align:"center",width:6})
+              startMoving=false;
+              clearInterval(update);
+              setTimeout(function(){
+                  //kill music
+                  sounds.forEach(function(sound){
+                      sound.components.sound.stopSound()
+                  })
+              },1000) 
+              
+              setTimeout(function(){
+                  location.reload();
+              },2000)
+          }
+      }
+      
+      var addEnemies = function(){
+          for(var i = 0; i < 100; i++){
+              var enemy = document.createElement("a-box");
+              enemy.setAttribute("color",colors[Math.floor(Math.random()* colors.length)])
+              enemy.setAttribute("position",{x:Math.floor(Math.random() * 40) * (Math.random() <= 0.5 ? 1 : -1),y:1, z:i * (-3)})
+              enemy.setAttribute("width",Math.floor(Math.random()*5) + 1)
+              enemy.setAttribute("height",Math.floor(Math.random()*10) +4 )
+              enemy.setAttribute("src","#building" + Math.floor(Math.random()*2 + 1) )
+              enemies.push(enemy)
+              scene.appendChild(enemy)
+          }
+      }
+      
+      var addCoins = function(){
+          for(var i = 0; i < 30; i++){
+              var coin = document.createElement("a-circle")
+              coin.setAttribute("radius","0.5")
+              coin.setAttribute("position",{x:Math.floor(Math.random() * 40) * (Math.random() <= 0.5 ? 1 : -1),y:1, z:i * (-10)})
+//              coin.setAttribute("src","#blue")
+//              coin.setAttribute("transparent","true")
+              coin.setAttribute("color","yellow")
+              coin.setAttribute("opacity","0.5")
+              coin.setAttribute("class","coin")
+              coins.push(coin)
+              scene.appendChild(coin)
+             
+
+          }
+      }
+      
+      var checkCollision = function(player,object){
+          var playerPosition = player.getAttribute("position");
+          var objectPosition = object.getAttribute("position");
+          var xDiff = Math.abs(playerPosition.x - objectPosition.x)
+          var zDiff = Math.abs(playerPosition.z - objectPosition.z)
+          
+          if(xDiff <= minDistance && zDiff <= minDistance && object.getAttribute("class") !== "coin"){
+
+              //console.log("collided")
+              if(object.getAttribute("id") == "goal"){
+                  object.setAttribute("visible","false")
+                  //console.log('collided with goal')
+                  textBox.setAttribute("text",{value: "You escaped and no longer lost", align:"center"})
+              }else{
+                  //console.log("collided with building")
+                  hitSound = document.querySelector("#hit")
+                  hitSound.components.sound.playSound();
+              }
+              startMoving = false;
+              
+              
+              
+              clearInterval(update);
+              setTimeout(function(){
+                  //kill music
+                  sounds.forEach(function(sound){
+                      sound.components.sound.stopSound()
+                  })
+              },1000)
+              
+              setTimeout(function(){
+                  location.reload();
+              },2000)
+              
+              
+          }
+          
+          if(xDiff <= minDistance && zDiff <= minDistance && (object.getAttribute("class") == "coin" && object.getAttribute("visible") == true)){
+                //remove it
+                //object.parentNode.removeChild(object);
+              
+                object.setAttribute("visible",false)
+                  //console.log("collided with coin")
+                coinSound = document.querySelector("#coin")
+                coinSound.components.sound.playSound();
+                numCoins++;
+                //remove it
+                
+                textBox.setAttribute("text",{value: "Coins:" + numCoins.toString(),width:6,height:2,align:"center"})
+          }
+          
+      }
+      
+      
+    var countdown = setInterval(function(){
+        counter--;
+        
+        textBox.setAttribute("text",{value:"Countdown " + counter,width:10,height:2,align:"center"})
+        if(counter == 0){
+            clearInterval(countdown)
+            startMoving = true;
+            textBox.setAttribute("text",{value:"",width:10,height:2,align:"center"})
+        }
+        
+    },1000)
+      
+      
+      
+
+      
+      
+      
+    
+    </script>
+  </body>
+</html>
